@@ -15,6 +15,7 @@ type configServer struct {
 	Port          int
 	Hostname      string
 	EncryptionKey string
+	EncryptionIv  string
 }
 
 func (c *configServer) Addr() string {
@@ -23,6 +24,10 @@ func (c *configServer) Addr() string {
 
 func (c *configServer) SetEncryptionKey(key string) {
 	c.EncryptionKey = key
+}
+
+func (c *configServer) SetEncryptionIv(iv string) {
+	c.EncryptionIv = iv
 }
 
 const defaultConfig = `
