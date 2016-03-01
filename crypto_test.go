@@ -14,3 +14,13 @@ func TestEncryption(t *testing.T) {
 		t.Error("Expected:" + expected + " Got:" + result)
 	}
 }
+
+func TestDecryption(t *testing.T) {
+	var encrypted = "-YnikAVeJixWzPNTb9de8sm43yVldihlcndC1ZtRF3fnmTuud58iiRTPkqS1Zg_8"
+	var expected = "some really really really long plaintext"
+
+	result, _ := decrypt(key, iv, encrypted)
+	if result != expected {
+		t.Error("Expected:" + expected + " Got:" + result)
+	}
+}
