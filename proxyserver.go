@@ -7,15 +7,15 @@ import (
 
 type ProxyServer struct {
 	wsConn  *websocket.Conn
-	tcpConn *net.TCPConn
+	tcpConn net.Conn
 }
 
-func NewProxyServer(wsConn *websocket.Conn, tcpConn *net.TCPConn) *ProxyServer {
+func NewProxyServer(wsConn *websocket.Conn, tcpConn net.Conn) *ProxyServer {
 	proxyserver := ProxyServer{wsConn, tcpConn}
 	return &proxyserver
 }
 
-func (proxyserver *ProxyServer) doProxy() {
+func (proxyserver *ProxyServer) DoProxy() {
 	go proxyserver.wsToTcp()
 	proxyserver.tcpToWs()
 }

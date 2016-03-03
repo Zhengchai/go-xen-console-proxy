@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -16,12 +17,11 @@ import (
 )
 
 var (
-	cfg         Config
-	logger      *log.Logger
-	proxyserver *ProxyServer
-	err         error
-	host        string
-	port        string
+	cfg    Config
+	logger *log.Logger
+	err    error
+	host   string
+	port   string
 )
 
 type EncryptorSecret struct {
@@ -37,58 +37,23 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func ProxyConnection(src, dest net.Conn) {
-
-	buffer := make([]byte, 1024)
-
-	for {
-		n, err := src.Read(buffer)
-		if err != nil {
-			log.Fatalf("Unable to read from socket" + err.Error())
-		}
-
-		n, err = dest.Write(buffer[0:n])
-		if err != nil {
-			log.Fatalf("Unable to write to socket" + err.Error())
-		}
-	}
-}
-
 // Given a local session, establish a Websocket <-> HTTPS tunnel to the
 // Xenserver
 func handleVncWebsocketProxy(w http.ResponseWriter, r *http.Request) {
-
 	wsConn, err := upgrader.Upgrade(w, r, nil)
-
 	if err != nil {
-		logger.Printf(err.Error())
-		return
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+	defer wsConn.Close()
 
-	dataType, data, err := wsConn.ReadMessage()
+	xenConn, err := initXenConnection(r)
 	if err != nil {
-		_ = wsConn.WriteMessage(dataType, []byte("Fail: "+err.Error()))
-		return
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+	defer xenConn.Close()
 
-	tcpAddr, err := net.ResolveTCPAddr("tcp", string(data))
-	if err != nil {
-		errorMsg := "FAIL(net resolve tcp addr): " + err.Error()
-		logger.Println(errorMsg)
-		_ = wsConn.WriteMessage(websocket.CloseMessage, []byte(errorMsg))
-		return
-	}
-
-	tcpConn, err := net.DialTCP("tcp", nil, tcpAddr)
-	if err != nil {
-		errorMsg := "FAIL(net dial tcp): " + err.Error()
-		logger.Println(errorMsg)
-		_ = wsConn.WriteMessage(websocket.CloseMessage, []byte(errorMsg))
-		return
-	}
-
-	proxyserver = NewProxyServer(wsConn, tcpConn)
-	go proxyserver.doProxy()
+	proxy := NewProxyServer(wsConn, xenConn)
+	proxy.DoProxy()
 }
 
 // Decypt and get the tunnel URL and xenserver session ID, setup a new local session
@@ -162,33 +127,32 @@ func handleSetEncryptorPassword(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func initXenConnection(w http.ResponseWriter, r *http.Request) net.Conn {
+func initXenConnection(r *http.Request) (net.Conn, error) {
 	log.Printf("VNC request " + r.URL.String())
 
 	paths := strings.Split(r.URL.Path, "/")
 
 	if len(paths) < 3 || !IsUUID(paths[2]) || SessionMap[paths[2]] == nil {
-		log.Printf("Unable to find session")
-		http.Error(w, "Not Found", http.StatusInternalServerError)
+		mesg := "Unable to find session"
+		log.Printf(mesg)
+		return nil, errors.New(mesg)
 	}
 
 	session := SessionMap[paths[2]]
 	log.Printf("session:\n%+v\n", session)
 
 	if session.ClientTunnelSession == "" || session.ClientTunnelUrl == "" {
-		log.Printf("Unable to find Tunnel URL or Tunnel Session")
-		delete(SessionMap, paths[2])
-		http.Error(w, "Not Found", http.StatusInternalServerError)
-		return nil
+		mesg := "Unable to find Tunnel URL or Tunnel Session"
+		log.Printf(mesg)
+		return nil, errors.New(mesg)
 	}
 
 	//open session to Xenserver
 	tunnelUrl, err := url.Parse(session.ClientTunnelUrl)
 	if err != nil {
-		log.Printf("Unable to parse session URL")
-		delete(SessionMap, paths[2])
-		http.Error(w, "Not Found", http.StatusInternalServerError)
-		return nil
+		mesg := "Unable to parse session URL"
+		log.Printf(mesg)
+		return nil, errors.New(mesg)
 	}
 
 	host := tunnelUrl.Host
@@ -201,26 +165,24 @@ func initXenConnection(w http.ResponseWriter, r *http.Request) net.Conn {
 	_, err = xenConn.Write([]byte(data))
 	if err != nil {
 		logger.Println(err.Error())
-		http.Error(w, "Not Found", http.StatusInternalServerError)
-		return nil
+		return nil, err
 	}
 
 	buffer := make([]byte, 1024)
 	_, err = xenConn.Read(buffer)
-
 	if err != nil {
 		log.Printf("Error reading data from xenserver " + err.Error())
-		http.Error(w, "Not Found", http.StatusInternalServerError)
-		return nil
+		return nil, err
 	}
 
+	fmt.Printf(string(buffer))
 	if !strings.Contains(string(buffer), "200 OK") {
-		log.Printf("non 200 response from xenserver https")
-		http.Error(w, "Not Found", http.StatusInternalServerError)
-		return nil
+		mesg := "non 200 response from xenserver https"
+		log.Printf(mesg)
+		return nil, errors.New(mesg)
 	}
 
-	return xenConn
+	return xenConn, nil
 }
 
 func main() {
