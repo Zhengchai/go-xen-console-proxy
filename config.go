@@ -33,7 +33,7 @@ func (c *configServer) SetEncryptionIv(iv string) {
 const defaultConfig = `
 	[server]
 	port=9090
-	hostname=
+	hostname=0.0.0.0
 `
 
 func init() {

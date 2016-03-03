@@ -16,8 +16,10 @@ type ConsoleSession struct {
 	ClientTunnelSession string `json:"clientTunnelSession"`
 }
 
+var SessionMap map[string]*ConsoleSession = make(map[string]*ConsoleSession)
+
 // Decrypts a token string and returns a session struct
-func NewConsoleSession(token, key, iv string) (*ConsoleSession, error) {
+func NewConsoleSession(key, iv, token string) (*ConsoleSession, error) {
 	decrypted, err := decrypt(key, iv, token)
 	if err != nil {
 		log.Println("Error decrypting")
