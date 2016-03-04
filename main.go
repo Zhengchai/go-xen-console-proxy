@@ -140,6 +140,8 @@ func handleSetEncryptorPassword(w http.ResponseWriter, r *http.Request) {
 		cfg.Server.SetEncryptionIv(secret.Iv)
 		fmt.Fprintf(w, "Password was set %s:%s ", secret.Key, secret.Iv)
 	}
+
+	log.Printf("Password was set\n")
 }
 
 func initXenConnection(session *ConsoleSession) (*tls.Conn, error) {
@@ -207,7 +209,7 @@ func main() {
 	logger.Printf("listening on %s\n", cfg.Server.Addr())
 	http.HandleFunc("/console", handleNewConsoleConnection)
 	http.HandleFunc("/setEncryptorPassword", handleSetEncryptorPassword)
-	http.HandleFunc("/static/", handleStatic)
+	http.Handle("/static/", http.FileServer(FS(false)))
 	http.HandleFunc("/vnc/", handleVncWebsocketProxy)
 	http.ListenAndServe(cfg.Server.Addr(), context.ClearHandler(http.DefaultServeMux))
 }
