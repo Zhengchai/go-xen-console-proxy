@@ -1,12 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -40,13 +40,28 @@ var upgrader = websocket.Upgrader{
 // Given a local session, establish a Websocket <-> HTTPS tunnel to the
 // Xenserver
 func handleVncWebsocketProxy(w http.ResponseWriter, r *http.Request) {
+	log.Printf("VNC request " + r.URL.String())
+	paths := strings.Split(r.URL.Path, "/")
+
+	if len(paths) < 3 || !IsUUID(paths[2]) || SessionMap[paths[2]] == nil {
+		mesg := "Unable to find session"
+		log.Printf(mesg)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	session := SessionMap[paths[2]]
+	log.Printf("session:\n%+v\n", session)
+
 	wsConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		delete(SessionMap, paths[2])
+		return
 	}
 	defer wsConn.Close()
 
-	xenConn, err := initXenConnection(r)
+	xenConn, err := initXenConnection(session)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -127,19 +142,7 @@ func handleSetEncryptorPassword(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func initXenConnection(r *http.Request) (net.Conn, error) {
-	log.Printf("VNC request " + r.URL.String())
-
-	paths := strings.Split(r.URL.Path, "/")
-
-	if len(paths) < 3 || !IsUUID(paths[2]) || SessionMap[paths[2]] == nil {
-		mesg := "Unable to find session"
-		log.Printf(mesg)
-		return nil, errors.New(mesg)
-	}
-
-	session := SessionMap[paths[2]]
-	log.Printf("session:\n%+v\n", session)
+func initXenConnection(session *ConsoleSession) (*tls.Conn, error) {
 
 	if session.ClientTunnelSession == "" || session.ClientTunnelUrl == "" {
 		mesg := "Unable to find Tunnel URL or Tunnel Session"
@@ -168,15 +171,29 @@ func initXenConnection(r *http.Request) (net.Conn, error) {
 		return nil, err
 	}
 
-	buffer := make([]byte, 1024)
-	_, err = xenConn.Read(buffer)
-	if err != nil {
-		log.Printf("Error reading data from xenserver " + err.Error())
-		return nil, err
+	reader := bufio.NewReader(xenConn)
+
+	//buffer := make([]byte, 1024)
+	success := false
+	for {
+		l, _, err := reader.ReadLine()
+		line := string(l)
+		if err != nil {
+			log.Printf("Error reading data from xenserver " + err.Error())
+			return nil, err
+		}
+		fmt.Println(line)
+		fmt.Println([]byte(line))
+		if line == "HTTP/1.1 200 OK" {
+			success = true
+		}
+
+		if line == "" {
+			break
+		}
 	}
 
-	fmt.Printf(string(buffer))
-	if !strings.Contains(string(buffer), "200 OK") {
+	if !success {
 		mesg := "non 200 response from xenserver https"
 		log.Printf(mesg)
 		return nil, errors.New(mesg)

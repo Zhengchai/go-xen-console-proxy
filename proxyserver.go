@@ -1,17 +1,17 @@
 package main
 
 import (
+	"crypto/tls"
 	"github.com/gorilla/websocket"
-	"net"
 )
 
 type ProxyServer struct {
 	wsConn  *websocket.Conn
-	tcpConn net.Conn
+	tlsConn *tls.Conn
 }
 
-func NewProxyServer(wsConn *websocket.Conn, tcpConn net.Conn) *ProxyServer {
-	proxyserver := ProxyServer{wsConn, tcpConn}
+func NewProxyServer(wsConn *websocket.Conn, tlsConn *tls.Conn) *ProxyServer {
+	proxyserver := ProxyServer{wsConn, tlsConn}
 	return &proxyserver
 }
 
@@ -24,9 +24,9 @@ func (proxyserver *ProxyServer) tcpToWs() {
 	buffer := make([]byte, 1024)
 
 	for {
-		n, err := proxyserver.tcpConn.Read(buffer)
+		n, err := proxyserver.tlsConn.Read(buffer)
 		if err != nil {
-			proxyserver.tcpConn.Close()
+			proxyserver.tlsConn.Close()
 			break
 		}
 
@@ -44,7 +44,7 @@ func (proxyserver *ProxyServer) wsToTcp() {
 			break
 		}
 
-		_, err = proxyserver.tcpConn.Write(data)
+		_, err = proxyserver.tlsConn.Write(data)
 		if err != nil {
 			logger.Println(err.Error())
 			break
