@@ -29,14 +29,6 @@ type EncryptorSecret struct {
 	Iv  string `json:"base64EncodedIvBytes"`
 }
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
-
 // Given a local session, establish a Websocket <-> HTTPS tunnel to the
 // Xenserver
 func handleVncWebsocketProxy(w http.ResponseWriter, r *http.Request) {
@@ -51,21 +43,30 @@ func handleVncWebsocketProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	session := SessionMap[paths[2]]
-	log.Printf("session:\n%+v\n", session)
+	log.Printf("session:%+v\n", session)
+
+	upgrader := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
 
 	wsConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 		delete(SessionMap, paths[2])
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer wsConn.Close()
+	wsConn.SetReadLimit(1024)
 
 	xenConn, err := initXenConnection(session)
 	if err != nil {
+		delete(SessionMap, paths[2])
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	defer xenConn.Close()
 
 	proxy := NewProxyServer(wsConn, xenConn)
 	proxy.DoProxy()
@@ -84,7 +85,6 @@ func handleNewConsoleConnection(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if path == "" {
-		log.Printf("Setting new session !!!")
 
 		token := r.URL.Query().Get("token")
 		consoleSession, err := NewConsoleSession(cfg.Server.EncryptionKey, cfg.Server.EncryptionIv, token)
@@ -95,8 +95,9 @@ func handleNewConsoleConnection(w http.ResponseWriter, r *http.Request) {
 		}
 
 		sessionId = uuid.NewV4().String()
+		log.Printf("Setting new session:" + sessionId)
 		SessionMap[sessionId] = consoleSession
-		http.Redirect(w, r, "/static/vnc_auto.html?path="+sessionId, http.StatusFound)
+		http.Redirect(w, r, "/static/vnc.html?path="+sessionId, http.StatusFound)
 
 	} else {
 		log.Printf("got session %s ", path)
@@ -175,7 +176,6 @@ func initXenConnection(session *ConsoleSession) (*tls.Conn, error) {
 
 	reader := bufio.NewReader(xenConn)
 
-	//buffer := make([]byte, 1024)
 	success := false
 	for {
 		l, _, err := reader.ReadLine()
@@ -185,7 +185,6 @@ func initXenConnection(session *ConsoleSession) (*tls.Conn, error) {
 			return nil, err
 		}
 		fmt.Println(line)
-		fmt.Println([]byte(line))
 		if line == "HTTP/1.1 200 OK" {
 			success = true
 		}

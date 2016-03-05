@@ -2,7 +2,9 @@ package main
 
 import (
 	"crypto/tls"
+	"fmt"
 	"github.com/gorilla/websocket"
+	"log"
 )
 
 type ProxyServer struct {
@@ -25,14 +27,21 @@ func (proxyserver *ProxyServer) tcpToWs() {
 
 	for {
 		n, err := proxyserver.tlsConn.Read(buffer)
+		fmt.Printf("x")
 		if err != nil {
+			log.Printf(err.Error())
 			proxyserver.tlsConn.Close()
+			proxyserver.wsConn.Close()
 			break
 		}
 
 		err = proxyserver.wsConn.WriteMessage(websocket.BinaryMessage, buffer[0:n])
+		fmt.Printf("W")
 		if err != nil {
-			logger.Println(err.Error())
+			log.Println(err.Error())
+			proxyserver.tlsConn.Close()
+			proxyserver.wsConn.Close()
+			break
 		}
 	}
 }
@@ -40,13 +49,21 @@ func (proxyserver *ProxyServer) tcpToWs() {
 func (proxyserver *ProxyServer) wsToTcp() {
 	for {
 		_, data, err := proxyserver.wsConn.ReadMessage()
+		fmt.Printf("w")
+		fmt.Printf(string(data))
 		if err != nil {
+			log.Println(err.Error())
+			proxyserver.wsConn.Close()
+			proxyserver.tlsConn.Close()
 			break
 		}
 
 		_, err = proxyserver.tlsConn.Write(data)
+		fmt.Printf("X")
 		if err != nil {
-			logger.Println(err.Error())
+			log.Println(err.Error())
+			proxyserver.wsConn.Close()
+			proxyserver.tlsConn.Close()
 			break
 		}
 	}
