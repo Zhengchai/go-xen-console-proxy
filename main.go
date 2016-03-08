@@ -111,7 +111,7 @@ func handleNewConsoleConnection(w http.ResponseWriter, r *http.Request) {
 
 		isValid := consoleSession.Validate()
 		if !isValid {
-			log.Printf(" invalid session " + err.Error())
+			log.Printf(" invalid session ")
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
