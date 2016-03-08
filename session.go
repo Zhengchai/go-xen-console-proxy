@@ -1,8 +1,15 @@
 package main
 
 import (
+	"crypto/sha256"
+	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"log"
+	"net/url"
+	"regexp"
+
+	"github.com/gorilla/websocket"
 )
 
 type ConsoleSession struct {
@@ -14,6 +21,9 @@ type ConsoleSession struct {
 	locale              string `json:"locale"`
 	ClientTunnelUrl     string `json:"clientTunnelUrl"`
 	ClientTunnelSession string `json:"clientTunnelSession"`
+
+	wsConn  *websocket.Conn
+	tlsConn *tls.Conn
 }
 
 var SessionMap map[string]*ConsoleSession = make(map[string]*ConsoleSession)
@@ -33,4 +43,39 @@ func NewConsoleSession(key, iv, token string) (*ConsoleSession, error) {
 	}
 
 	return &session, nil
+}
+
+func (s *ConsoleSession) Validate() bool {
+	//check if a valid session is given
+	r := regexp.MustCompile("^OpaqueRef:[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[8|9|aA|bB][a-f0-9]{3}-[a-f0-9]{12}$")
+	if !r.MatchString(s.ClientTunnelSession) {
+		return false
+	}
+
+	//check if the URL is valid
+	tunnelUrl, err := url.Parse(s.ClientTunnelUrl)
+	if err != nil {
+		return false
+	}
+
+	//check if query contains console uuid
+	consoleUUID := tunnelUrl.Query().Get("uuid")
+	if consoleUUID == "" {
+		return false
+	}
+
+	//check if the console UUID is a valid UUID
+	r = regexp.MustCompile("^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[8|9|aA|bB][a-f0-9]{3}-[a-f0-9]{12}$")
+	if !r.MatchString(consoleUUID) {
+		return false
+	}
+
+	return true
+}
+
+//The UUID for a session is the SHA256 of its TunnelSession and TunnelURL
+func (s *ConsoleSession) GenerateUuid() string {
+	hash := sha256.Sum256([]byte(s.ClientTunnelUrl + s.ClientTunnelSession))
+	return base64.URLEncoding.EncodeToString(hash[:])
+
 }

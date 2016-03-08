@@ -439,6 +439,7 @@ html {
   position: absolute;
   width: 100%;
   margin-left: 0px;
+  display: none;
 }
 
 #showExtraKeysButton { display: none; }

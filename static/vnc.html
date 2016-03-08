@@ -101,17 +101,20 @@
             <input type="image" alt="Clipboard" src="images/clipboard.png"
                 id="clipboardButton" class="noVNC_status_button"
                 title="Clipboard" />
+            <input type="image" alt="Paste" src="images/keyboard.png"
+                id="pasteButton" class="noVNC_status_button"
+                title="Paste" />
             <input type="image" alt="Fullscreen" src="images/fullscreen.png"
                 id="fullscreenButton" class="noVNC_status_button"
                 title="Fullscreen" />
             <input type="image" alt="Settings" src="images/settings.png"
                 id="settingsButton" class="noVNC_status_button"
-                title="Settings" />
+                title="Settings" style="display:none" />
             <input type="image" alt="Connect" src="images/connect.png"
                 id="connectButton" class="noVNC_status_button"
-                title="Connect" />
+                title="Connect" style="display:none" />
             <input type="image" alt="Disconnect" src="images/disconnect.png"
-                id="disconnectButton" class="noVNC_status_button"
+            id="disconnectButton" class="noVNC_status_button" style="display:none"
                 title="Disconnect" />
         </div>
 
@@ -208,8 +211,6 @@
 
 
     <div id="noVNC_screen">
-        <h1 id="noVNC_logo"><span>no</span><br />VNC</h1>
-
         <!-- HTML5 Canvas -->
         <div id="noVNC_container">
             <canvas id="noVNC_canvas" width="0" height="0">

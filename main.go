@@ -13,7 +13,6 @@ import (
 
 	"github.com/gorilla/context"
 	"github.com/gorilla/websocket"
-	"github.com/satori/go.uuid"
 )
 
 var (
@@ -32,6 +31,10 @@ type EncryptorSecret struct {
 // Given a local session, establish a Websocket <-> HTTPS tunnel to the
 // Xenserver
 func handleVncWebsocketProxy(w http.ResponseWriter, r *http.Request) {
+
+	// XXX: With the current implementation, anyone who has a valid sessionID
+	// can gain access to the VNC
+
 	log.Printf("VNC request " + r.URL.String())
 	paths := strings.Split(r.URL.Path, "/")
 
@@ -42,8 +45,16 @@ func handleVncWebsocketProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session := SessionMap[paths[2]]
+	sessionID := paths[2]
+
+	session := SessionMap[sessionID]
 	log.Printf("session:%+v\n", session)
+
+	//if there is a previous session running, close it
+	if session.wsConn != nil || session.tlsConn != nil {
+		session.wsConn.Close()
+		session.tlsConn.Close()
+	}
 
 	upgrader := websocket.Upgrader{
 		ReadBufferSize:  1024,
@@ -53,29 +64,33 @@ func handleVncWebsocketProxy(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	wsConn, err := upgrader.Upgrade(w, r, nil)
+	h := http.Header{}
+	h.Set("Sec-WebSocket-Protocol", "binary")
+
+	wsConn, err := upgrader.Upgrade(w, r, h)
 	if err != nil {
-		delete(SessionMap, paths[2])
+		delete(SessionMap, sessionID)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	wsConn.SetReadLimit(1024)
 
 	xenConn, err := initXenConnection(session)
 	if err != nil {
-		delete(SessionMap, paths[2])
+		delete(SessionMap, sessionID)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	proxy := NewProxyServer(wsConn, xenConn)
+	session.wsConn = wsConn
+	session.tlsConn = xenConn
+
+	proxy := NewProxyServer(sessionID, wsConn, xenConn)
 	proxy.DoProxy()
 }
 
 // Decypt and get the tunnel URL and xenserver session ID, setup a new local session
 // with all the variables and serve the vnc.html.
 func handleNewConsoleConnection(w http.ResponseWriter, r *http.Request) {
-	var sessionId string
 	logger.Printf("new connection from: %s", r.RemoteAddr)
 	path := r.URL.Query().Get("path")
 
@@ -94,12 +109,20 @@ func handleNewConsoleConnection(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		sessionId = uuid.NewV4().String()
+		isValid := consoleSession.Validate()
+		if !isValid {
+			log.Printf(" invalid session " + err.Error())
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		sessionId := consoleSession.GenerateUuid()
 		log.Printf("Setting new session:" + sessionId)
 		SessionMap[sessionId] = consoleSession
 		http.Redirect(w, r, "/static/vnc.html?path="+sessionId, http.StatusFound)
 
 	} else {
+
 		log.Printf("got session %s ", path)
 		consoleSession := SessionMap[path]
 
@@ -108,8 +131,7 @@ func handleNewConsoleConnection(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Not Found", http.StatusInternalServerError)
 		}
 
-		http.ServeFile(w, r, "static/vnc_auto.html")
-
+		http.ServeFile(w, r, "static/vnc.html")
 	}
 
 }

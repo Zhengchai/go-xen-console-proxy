@@ -16,7 +16,7 @@ var UI;
     "use strict";
 
     // Load supporting scripts
-    window.onscriptsload = function () { UI.load(); };
+    window.onscriptsload = function () { UI.load(); UI.connect()};
     Util.load_scripts(["webutil.js", "base64.js", "websock.js", "des.js",
                        "keysymdef.js", "keyboard.js", "input.js", "display.js",
                        "rfb.js", "keysym.js", "inflator.js"]);
@@ -219,6 +219,7 @@ var UI;
             $D("noVNC_popup_status").onclick = UI.togglePopupStatus;
             $D("xvpButton").onclick = UI.toggleXvpPanel;
             $D("clipboardButton").onclick = UI.toggleClipboardPanel;
+            $D("pasteButton").onclick = UI.pasteClipboard;
             $D("fullscreenButton").onclick = UI.toggleFullscreen;
             $D("settingsButton").onclick = UI.toggleSettingsPanel;
             $D("connectButton").onclick = UI.toggleConnectPanel;
@@ -493,6 +494,15 @@ var UI;
                 $D('fullscreenButton').className = "noVNC_status_button";
             }
         },
+
+		pasteClipboard: function() {
+            var text = $D('noVNC_clipboard_text').value;
+            Util.Debug(">> UI.clipSend: " + text.substr(0,40) + "...");
+			for (var i = 0, len = text.length; i < len; i++) {
+				UI.rfb.sendKey(text.charCodeAt(i))
+			}
+
+		},
 
         // Show the connection settings panel/menu
         toggleConnectPanel: function() {
@@ -813,7 +823,7 @@ var UI;
             var port = $D('noVNC_port').value;
             var password = $D('noVNC_password').value;
             var token = $D('noVNC_token').value;
-            var path = $D('noVNC_path').value;
+            var path = "vnc/" + $D('noVNC_path').value;
 
             //if token is in path then ignore the new token variable
             if (token) {
