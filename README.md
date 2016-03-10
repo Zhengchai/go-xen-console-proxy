@@ -27,6 +27,9 @@ cp go-xen-console-proxy ./systemvm/patches/debian/config/opt/cloud/bin/go-xen-co
 replace the new `systemvm.iso` to the Xen host and destroy the console VM from cloudstack. A new console proxy VM will be 
 created which will have the proxy.
 
+NOTE: I've seen a problem where a new systemvm.iso creates a new SSH key and replacing the systemvm.iso on Xen will cause 
+problems as the ssh key will not match on the xenserver and inside systemvms. 
+
 
 # High level workflow
 
