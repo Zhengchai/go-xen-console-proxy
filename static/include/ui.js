@@ -759,7 +759,7 @@ var UI;
             // It is enabled (toggled) by direct click on the button
             UI.updateViewDrag(false);
 
-            switch (UI.rfb_state) {
+            /* switch (UI.rfb_state) {
                 case 'fatal':
                 case 'failed':
                 case 'disconnected':
@@ -776,7 +776,7 @@ var UI;
                     $D('connectButton').style.display = "none";
                     $D('disconnectButton').style.display = "";
                     break;
-            }
+            }*/
 
             //Util.Debug("<< updateVisualState");
         },
@@ -847,7 +847,7 @@ var UI;
 
             //Close dialog.
             setTimeout(UI.setBarPosition, 100);
-            $D('noVNC_logo').style.display = "none";
+            //$D('noVNC_logo').style.display = "none";
             $D('noVNC_container').style.display = "inline";
         },
 
