@@ -38,7 +38,7 @@ func handleVncWebsocketProxy(w http.ResponseWriter, r *http.Request) {
 	log.Printf("VNC request " + r.URL.String())
 	paths := strings.Split(r.URL.Path, "/")
 
-	if len(paths) < 3 || !IsUUID(paths[2]) || SessionMap[paths[2]] == nil {
+	if len(paths) < 3 || SessionMap[paths[2]] == nil {
 		mesg := "Unable to find session"
 		log.Printf(mesg)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
