@@ -6,7 +6,8 @@ import (
 	"crypto/cipher"
 	b64 "encoding/base64"
 	"errors"
-	"log"
+
+	"github.com/Sirupsen/logrus"
 )
 
 func encrypt(key_str, iv_str, text string) (string, error) {
@@ -15,12 +16,24 @@ func encrypt(key_str, iv_str, text string) (string, error) {
 	iv, err2 := b64.RawURLEncoding.DecodeString(iv_str)
 
 	if err1 != nil || err2 != nil {
-		log.Println("Error decoding key/iv")
-		return "", errors.New("Error decoding key/iv")
+
+		mesg := "Error decoding key/iv"
+
+		log.WithFields(logrus.Fields{
+			"err1": err1,
+			"err2": err2,
+		}).Warn("Error decoding key/iv pair")
+
+		return "", errors.New(mesg)
 	}
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
+
+		log.WithFields(logrus.Fields{
+			"err": err,
+		}).Warn("Error creating a new cipher")
+
 		return "", err
 	}
 
@@ -41,8 +54,15 @@ func decrypt(key_str, iv_str, ciphertext string) (string, error) {
 	text, err3 := b64.RawURLEncoding.DecodeString(ciphertext)
 
 	if err1 != nil || err2 != nil || err3 != nil {
-		log.Println("Error decoding key/iv/data")
-		return "", errors.New("Error decoding key/iv")
+		mesg := "Error decrypting key/iv/text"
+
+		log.WithFields(logrus.Fields{
+			"err1": err1,
+			"err2": err2,
+			"err3": err3,
+		}).Warn(mesg)
+
+		return "", errors.New(mesg)
 	}
 
 	block, err := aes.NewCipher(key)

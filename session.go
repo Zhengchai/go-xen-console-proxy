@@ -5,10 +5,10 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
-	"log"
 	"net/url"
 	"regexp"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/websocket"
 )
 
@@ -32,13 +32,21 @@ var SessionMap map[string]*ConsoleSession = make(map[string]*ConsoleSession)
 func NewConsoleSession(key, iv, token string) (*ConsoleSession, error) {
 	decrypted, err := decrypt(key, iv, token)
 	if err != nil {
-		log.Println("Error decrypting")
+
+		log.WithFields(logrus.Fields{
+			"err": err,
+		}).Warn("Error decrypting")
+
 		return nil, err
 	}
 	var session ConsoleSession
 	err = json.Unmarshal([]byte(decrypted), &session)
 	if err != nil {
-		log.Println("Error decoding json")
+
+		log.WithFields(logrus.Fields{
+			"err": err,
+		}).Warn("Error decoding JSON")
+
 		return nil, err
 	}
 

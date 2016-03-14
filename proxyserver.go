@@ -2,8 +2,8 @@ package main
 
 import (
 	"crypto/tls"
-	"log"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/websocket"
 )
 
@@ -30,6 +30,12 @@ func (proxyserver *ProxyServer) tcpToWs() {
 		n, err := proxyserver.tlsConn.Read(buffer)
 		if err != nil {
 			log.Printf(err.Error())
+
+			log.WithFields(logrus.Fields{
+				"err":         err,
+				"proxyserver": proxyserver,
+			}).Warn("Error reading from TLS")
+
 			delete(SessionMap, proxyserver.sessionID)
 			proxyserver.tlsConn.Close()
 			proxyserver.wsConn.Close()
@@ -38,7 +44,12 @@ func (proxyserver *ProxyServer) tcpToWs() {
 
 		err = proxyserver.wsConn.WriteMessage(websocket.BinaryMessage, buffer[0:n])
 		if err != nil {
-			log.Println(err.Error())
+
+			log.WithFields(logrus.Fields{
+				"err":         err,
+				"proxyserver": proxyserver,
+			}).Warn("Error writing to websocket")
+
 			delete(SessionMap, proxyserver.sessionID)
 			proxyserver.tlsConn.Close()
 			proxyserver.wsConn.Close()
@@ -51,7 +62,11 @@ func (proxyserver *ProxyServer) wsToTcp() {
 	for {
 		_, data, err := proxyserver.wsConn.ReadMessage()
 		if err != nil {
-			log.Println(err.Error())
+			log.WithFields(logrus.Fields{
+				"err":         err,
+				"proxyserver": proxyserver,
+			}).Warn("Error reading from websocket")
+
 			delete(SessionMap, proxyserver.sessionID)
 			proxyserver.wsConn.Close()
 			proxyserver.tlsConn.Close()
@@ -60,7 +75,11 @@ func (proxyserver *ProxyServer) wsToTcp() {
 
 		_, err = proxyserver.tlsConn.Write(data)
 		if err != nil {
-			log.Println(err.Error())
+			log.WithFields(logrus.Fields{
+				"err":         err,
+				"proxyserver": proxyserver,
+			}).Warn("Error writing to tls")
+
 			delete(SessionMap, proxyserver.sessionID)
 			proxyserver.wsConn.Close()
 			proxyserver.tlsConn.Close()

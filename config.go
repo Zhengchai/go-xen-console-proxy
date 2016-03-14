@@ -1,11 +1,13 @@
 package main
 
 import (
+	"github.com/Sirupsen/logrus"
 	"gopkg.in/gcfg.v1"
-	"log"
 	"os"
 	"strconv"
 )
+
+var log = logrus.New()
 
 type Config struct {
 	Server configServer
@@ -37,7 +39,6 @@ const defaultConfig = `
 `
 
 func init() {
-	logger = log.New(os.Stdout, "[websockify] ", log.Ldate|log.Ltime)
 
 	err = gcfg.ReadStringInto(&cfg, defaultConfig)
 	if err != nil {
